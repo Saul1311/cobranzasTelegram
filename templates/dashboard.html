@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Panel</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+  <style>
+    .cards{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;margin-top:14px;}
+    .card{grid-column:span 6;}
+    .card h2{margin:0 0 8px 0;font-size:18px}
+    .card p{margin:0 0 14px 0;color:rgba(234,240,255,.75);font-size:13px;line-height:1.35}
+    .actions{display:flex;gap:12px;flex-wrap:wrap}
+    @media(max-width:900px){.card{grid-column:span 12;}}
+  </style>
+</head>
+<body>
+  <div class="gridlines"></div>
+  <div class="wrap">
+    <h1>📦 Inventario / Gestión de Clientes</h1>
+    <p class="sub">Todo se guarda en <b>registro.txt</b>.</p>
+
+    <div class="cards">
+      <div class="panel card">
+        <h2>🧾 REGISTRAR CLIENTE</h2>
+        <p>Agrega un cliente. “Días de servicio” permite elegir o escribir un número exacto.</p>
+        <div class="actions">
+          <a class="btn save" href="/registrar">REGISTRAR CLIENTE</a>
+          <a class="btn" href="/stats">VER BASE COMPLETA</a>
+        </div>
+      </div>
+
+      <div class="panel card">
+        <h2>💳 COBRAR CLIENTES</h2>
+        <p>Vencidos y 0 días salen primero. Incluye BUSCAR y cobrar masivo ≤ 5 días.</p>
+        <div class="actions">
+          <a class="btn tg" href="/cobrar">COBRAR CLIENTES</a>
+          <a class="btn" href="/stats">ESTADÍSTICAS / BASE COMPLETA</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

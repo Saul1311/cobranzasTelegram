@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>💳 Cobrar Clientes</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+  <style>
+    .top-actions{display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom:12px;}
+    .left-actions{display:flex; gap:12px; flex-wrap:wrap; align-items:center;}
+    .searchbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    .searchbar select,.searchbar input{
+      padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.14);
+      background: rgba(9,14,30,.55);color:var(--text);outline:none;font-size:13px;
+    }
+    table{
+      width:100%; border-collapse:separate; border-spacing:0;
+      overflow:hidden; border-radius:16px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(9,14,30,.55);
+    }
+    th,td{padding:12px 12px;text-align:left;font-size:13px;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:middle;}
+    th{font-weight:700;background:rgba(0,0,0,.22);position:sticky;top:0;backdrop-filter:blur(8px);z-index:2;}
+    tr:hover td{background: rgba(0,0,0,.18)}
+    .muted{color:rgba(234,240,255,.70)}
+    .neg{color: var(--pink); font-weight:900;}
+    .pos{color: var(--green); font-weight:900;}
+    .actions{display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;}
+
+    .modal-backdrop{position:fixed; inset:0;background: rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:18px;z-index:99;}
+    .modal{width:min(560px,100%);border-radius:18px;border:1px solid rgba(255,255,255,.12);background: rgba(9,14,30,.92);box-shadow: 0 30px 90px rgba(0,0,0,.70);padding:18px;}
+    .modal h2{margin:0 0 10px 0; font-size:18px}
+    .modal p{margin:0 0 14px 0; color:rgba(234,240,255,.78); font-size:13px; line-height:1.35}
+    .modal-actions{display:flex; gap:12px; justify-content:flex-end; flex-wrap:wrap;}
+    .btn.neon-ok{border:1px solid rgba(44,255,182,.40);}
+    .btn.neon-no{border:1px solid rgba(255,59,122,.45);}
+  </style>
+</head>
+<body>
+  <div class="gridlines"></div>
+  <div class="wrap">
+    <h1>💳 COBRAR CLIENTES</h1>
+    <p class="sub">Ordenado de menor a mayor días (vencidos/0 primero). Incluye BUSCAR 🔎</p>
+
+    <div class="panel">
+
+      {% if res %}
+        <div style="margin-bottom:12px; padding:10px 12px; border-radius:14px; border:1px solid rgba(255,255,255,.12); background: rgba(0,0,0,.22);">
+          Resultado: <b>{{ res }}</b>
+          {% if res == "NO_ENTIDAD_PARA_ID" %}
+            <div style="margin-top:6px; color: rgba(234,240,255,.75); font-size:12px;">
+              No se puede enviar a ese ID porque tu Telegram no tiene esa entidad (no hay chat previo/contacto).
+              Pide al cliente que te escriba primero o registra su @usuario.
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <div class="top-actions">
+        <div class="left-actions">
+          <a class="btn back" href="/">← Volver</a>
+          <a class="btn" href="/stats">📊 Ver base completa</a>
+        </div>
+
+        <form method="get" action="/cobrar" class="searchbar">
+          <select name="field">
+            <option value="ALL" {% if field=="ALL" %}selected{% endif %}>TODOS</option>
+            {% for f in search_fields %}
+              <option value="{{ f }}" {% if field==f %}selected{% endif %}>{{ f }}</option>
+            {% endfor %}
+          </select>
+          <input name="q" value="{{ q }}" placeholder="BUSCAR 🔎 (valor o texto)">
+          <button class="btn" type="submit">BUSCAR 🔎</button>
+          <a class="btn" href="/cobrar">LIMPIAR</a>
+        </form>
+
+        <form method="post" action="/cobrar/enviar_todos">
+          <button class="btn tg" type="submit">📨 COBRAR A TODOS (≤ 5 días)</button>
+        </form>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Servicio</th>
+            <th>Fecha Corte</th>
+            <th>Días Restantes</th>
+            <th style="text-align:right;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td>{{ r.cliente }}</td>
+            <td class="muted">{{ r.servicio }}</td>
+            <td class="muted">{{ r.fecha_corte }}</td>
+            <td>
+              {% if r.restantes is none %}
+                <span class="muted">-</span>
+              {% elif r.restantes <= 0 %}
+                <span class="neg">{{ r.restantes }}</span>
+              {% else %}
+                <span class="pos">{{ r.restantes }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="actions">
+                <form method="post" action="/cobrar/enviar/{{ r.id }}">
+                  <button class="btn tg mini" type="submit">✈️ COBRAR</button>
+                </form>
+
+                <button class="btn trash mini" type="button"
+                  data-id="{{ r.id }}" data-cliente="{{ r.cliente }}" data-servicio="{{ r.servicio }}"
+                  onclick="openDeleteModal(this)">
+                  🗑 ELIMINAR
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="deleteBackdrop" aria-hidden="true">
+    <div class="modal">
+      <h2>¿ESTÁS SEGURO DE ELIMINARLO?</h2>
+      <p id="deleteInfo"></p>
+      <div class="modal-actions">
+        <form id="deleteForm" method="post" action="">
+          <button class="btn neon-ok" type="submit">✅ SI, ACEPTO</button>
+        </form>
+        <button class="btn neon-no" type="button" onclick="closeDeleteModal()">❌ NO ELIMINAR</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const backdrop = document.getElementById("deleteBackdrop");
+    const deleteForm = document.getElementById("deleteForm");
+    const deleteInfo = document.getElementById("deleteInfo");
+
+    function openDeleteModal(btn){
+      const id = btn.dataset.id;
+      const cliente = btn.dataset.cliente || "";
+      const servicio = btn.dataset.servicio || "";
+      deleteForm.action = `/cobrar/eliminar/${id}`;
+      deleteInfo.textContent = `Se eliminará TODO el registro de: ${cliente} (${servicio}). Esta acción no se puede deshacer.`;
+      backdrop.style.display = "flex";
+      backdrop.setAttribute("aria-hidden", "false");
+    }
+    function closeDeleteModal(){
+      backdrop.style.display = "none";
+      backdrop.setAttribute("aria-hidden", "true");
+      deleteForm.action = "";
+      deleteInfo.textContent = "";
+    }
+    backdrop.addEventListener("click", (e)=>{ if(e.target === backdrop) closeDeleteModal(); });
+    window.addEventListener("keydown", (e)=>{ if(e.key === "Escape") closeDeleteModal(); });
+  </script>
+</body>
+</html>

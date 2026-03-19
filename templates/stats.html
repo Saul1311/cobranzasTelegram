@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>📊 Base Completa</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+  <style>
+    .top{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:12px;}
+    .searchbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    .searchbar select,.searchbar input{
+      padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.14);
+      background: rgba(9,14,30,.55);color:var(--text);outline:none;font-size:13px;
+    }
+    .tablewrap{overflow:auto;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:rgba(9,14,30,.55)}
+    table{width:1700px;border-collapse:separate;border-spacing:0}
+    th,td{padding:10px 10px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap}
+    th{position:sticky;top:0;background:rgba(0,0,0,.25);z-index:2}
+    tr:hover td{background:rgba(0,0,0,.18)}
+  </style>
+</head>
+<body>
+  <div class="gridlines"></div>
+  <div class="wrap">
+    <h1>📊 ESTADÍSTICAS / BASE COMPLETA</h1>
+    <p class="sub">Se lee 100% desde <b>registro.txt</b>. Incluye BUSCAR 🔎 y EDITAR.</p>
+
+    <div class="panel">
+      <div class="top">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <a class="btn back" href="/">← Volver</a>
+          <a class="btn" href="/cobrar">💳 Ir a Cobrar</a>
+        </div>
+
+        <form method="get" action="/stats" class="searchbar">
+          <select name="field">
+            <option value="ALL" {% if field=="ALL" %}selected{% endif %}>TODOS</option>
+            {% for f in search_fields %}
+              <option value="{{ f }}" {% if field==f %}selected{% endif %}>{{ f }}</option>
+            {% endfor %}
+          </select>
+          <input name="q" value="{{ q }}" placeholder="BUSCAR 🔎 (valor o texto)">
+          <button class="btn" type="submit">BUSCAR 🔎</button>
+          <a class="btn" href="/stats">LIMPIAR</a>
+        </form>
+      </div>
+
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              {% for f in fields %}
+                <th>{{ f }}</th>
+              {% endfor %}
+              <th>ACCIONES</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pair in regs_with_idx %}
+              {% set idx = pair[0] %}
+              {% set r = pair[1] %}
+              <tr>
+                <td>{{ idx }}</td>
+                {% for f in fields %}
+                  <td>{{ r.get(f, "") }}</td>
+                {% endfor %}
+                <td>
+                  <a class="btn mini" href="/editar/{{ idx }}">✏️ EDITAR</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

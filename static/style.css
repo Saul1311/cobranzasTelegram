@@ -1,0 +1,73 @@
+:root{
+  --bg1:#060816; --bg2:#0A1230;
+  --card: rgba(10, 14, 30, .60);
+  --text:#EAF0FF; --muted:#AAB4D6;
+  --cyan:#22d3ee; --purple:#7c3aed; --green:#34d399; --pink:#ff3b7a;
+  --shadow: 0 20px 65px rgba(0,0,0,.55);
+  --radius: 18px;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  color:var(--text);
+  min-height:100vh;
+  background:
+    radial-gradient(1100px 700px at 20% 10%, rgba(124,58,237,.30), transparent 55%),
+    radial-gradient(900px 600px at 80% 20%, rgba(34,211,238,.22), transparent 55%),
+    radial-gradient(900px 600px at 50% 90%, rgba(52,211,153,.16), transparent 55%),
+    linear-gradient(160deg, var(--bg1), var(--bg2));
+}
+.gridlines{
+  position:fixed; inset:0;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,.05) 1px, transparent 1px);
+  background-size: 70px 70px;
+  opacity:.12; pointer-events:none;
+  mask-image: radial-gradient(800px 520px at 50% 10%, black 30%, transparent 70%);
+}
+.wrap{max-width:1250px; margin:0 auto; padding:28px 18px 60px;}
+h1{margin:0 0 10px 0; font-size:26px}
+.sub{color:var(--muted); font-size:13px; margin:0 0 18px 0}
+.panel{
+  position:relative;
+  background:var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding:18px;
+  border:1px solid rgba(255,255,255,.08);
+  overflow:hidden;
+}
+.panel::before{
+  content:"";
+  position:absolute; inset:-2px;
+  background: linear-gradient(120deg, rgba(124,58,237,.85), rgba(34,211,238,.85), rgba(52,211,153,.85), rgba(255,59,122,.65));
+  filter: blur(12px);
+  opacity:.30;
+  z-index:0;
+}
+.panel > *{position:relative; z-index:1}
+.btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding:11px 14px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.22);
+  color:var(--text);
+  cursor:pointer;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  box-shadow: 0 12px 30px rgba(0,0,0,.35);
+  font-size:13px;
+  text-decoration:none;
+  user-select:none;
+}
+.btn:hover{transform: translateY(-1px); border-color: rgba(255,255,255,.22);}
+.btn.back{border:1px solid rgba(124,58,237,.35);}
+.btn.tg{border:1px solid rgba(34,211,238,.35);}
+.btn.save{border:1px solid rgba(52,211,153,.35);}
+.btn.trash{border:1px solid rgba(255,59,122,.40);}
+.mini{padding:9px 12px; border-radius:12px; font-size:12px;}

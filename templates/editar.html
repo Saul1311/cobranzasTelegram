@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>✏️ Editar Registro</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+  <style>
+    .row-actions{display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom:10px;}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;margin-top:12px;}
+    .field{
+      grid-column: span 6;
+      display:flex;flex-direction:column;gap:7px;
+      padding:12px;border-radius:16px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+    }
+    .field.full{grid-column: span 12;}
+    .field.third{grid-column: span 4;}
+    .field.quarter{grid-column: span 3;}
+    label{font-size:12px;color:rgba(234,240,255,.78)}
+    input, select{
+      padding:11px 12px;border-radius:14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(9,14,30,.55);
+      color: var(--text); outline:none; font-size:13px;
+    }
+    .hint{font-size:12px;color:rgba(234,240,255,.65)}
+    .days-row{display:flex;gap:10px;flex-wrap:wrap;}
+    .days-row > *{flex:1}
+    @media(max-width:900px){
+      .field{grid-column:span 12;}
+      .field.third,.field.quarter{grid-column:span 12;}
+    }
+  </style>
+</head>
+<body>
+  <div class="gridlines"></div>
+  <div class="wrap">
+    <h1>✏️ EDITAR REGISTRO</h1>
+    <p class="sub">ID de registro: <b>{{ registro_id }}</b> — Guarda en <b>registro.txt</b>.</p>
+
+    <div class="panel">
+      <div class="row-actions">
+        <a class="btn back" href="/stats">← Volver a Base Completa</a>
+        <button class="btn save" type="submit" form="frm">💾 Guardar Cambios</button>
+      </div>
+
+      <form id="frm" method="post" action="/editar/{{ registro_id }}">
+        <div class="grid">
+
+          <div class="field full">
+            <label>Nombre cliente</label>
+            <input name="nombre_cliente" value="{{ r.get('NOMBRE_CLIENTE','') }}" required>
+          </div>
+
+          <div class="field">
+            <label>@ del Cliente</label>
+            <input name="tiene_arroba" value="{{ r.get('TIENE_ARROBA','') }}" placeholder="@usuario">
+          </div>
+
+          <div class="field">
+            <label>ID_CLIENTE</label>
+            <input name="id_cliente" value="{{ r.get('ID_CLIENTE','') }}">
+          </div>
+
+          <div class="field">
+            <label>ID (telegram u otro)</label>
+            <input name="id_telegram" value="{{ r.get('ID','') }}">
+          </div>
+
+          <div class="field">
+            <label>Correo</label>
+            <input name="correo" value="{{ r.get('CORREO_ELECTRONICO','') }}">
+          </div>
+
+          <div class="field">
+            <label>Contraseña</label>
+            <input name="contrasena" value="{{ r.get('CONTRASEÑA','') }}">
+          </div>
+
+          <div class="field third">
+            <label>Fecha inicio (dd/mm/yyyy)</label>
+            <input id="fecha_inicio" name="fecha_inicio" value="{{ r.get('FECHA_INICIO','') }}">
+          </div>
+
+          <div class="field third">
+            <label>Días de servicio</label>
+            <div class="days-row">
+              <select id="dias_servicio_select">
+                <option value="30">30 días</option>
+                <option value="28">28 días</option>
+                <option value="15">15 días</option>
+                <option value="7">7 días</option>
+                <option value="90">90 días</option>
+              </select>
+              <input id="dias_custom" type="number" min="1" placeholder="Días exactos (ej: 43)">
+            </div>
+            <div class="hint">Si escribes días exactos, ese manda.</div>
+          </div>
+
+          <div class="field third">
+            <label>Fecha corte (dd/mm/yyyy)</label>
+            <input id="fecha_corte" name="fecha_corte" value="{{ r.get('FECHA_CORTE','') }}" readonly>
+          </div>
+
+          <div class="field full">
+            <label>Servicio otorgado</label>
+            <input name="servicio_otorgado" value="{{ r.get('SERVICIO_OTORGADO','') }}" required>
+          </div>
+
+          <div class="field quarter">
+            <label>Dispositivos</label>
+            <input name="dispositivos" value="{{ r.get('DISPOSITIVOS','') }}">
+          </div>
+
+          <div class="field quarter">
+            <label>Perfil (opcional)</label>
+            <input name="perfil_cuenta" value="{{ r.get('PERFIL_CUENTA','') }}">
+          </div>
+
+          <div class="field quarter">
+            <label>PIN (opcional)</label>
+            <input name="pin_cuenta" value="{{ r.get('PIN_CUENTA','') }}">
+          </div>
+
+          <div class="field quarter">
+            <label>Monto pagado</label>
+            <input name="monto_pagado" value="{{ r.get('MONTO_PAGADO','') }}" required>
+          </div>
+
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function parseDMY(str){
+      const s = (str || "").trim();
+      const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if(!m) return null;
+      const dd = parseInt(m[1],10);
+      const mm = parseInt(m[2],10)-1;
+      const yy = parseInt(m[3],10);
+      const d = new Date(yy, mm, dd);
+      if(d.getFullYear() !== yy || d.getMonth() !== mm || d.getDate() !== dd) return null;
+      return d;
+    }
+    function formatDMY(date){
+      const dd = String(date.getDate()).padStart(2,'0');
+      const mm = String(date.getMonth()+1).padStart(2,'0');
+      const yy = date.getFullYear();
+      return `${dd}/${mm}/${yy}`;
+    }
+    function getDias(){
+      const custom = parseInt(document.getElementById("dias_custom").value, 10);
+      if(custom && custom > 0) return custom;
+      return parseInt(document.getElementById("dias_servicio_select").value, 10);
+    }
+    function updateFechaCorte(){
+      const inicioStr = document.getElementById("fecha_inicio").value;
+      const dias = getDias();
+      const inicio = parseDMY(inicioStr);
+      const corteInput = document.getElementById("fecha_corte");
+      if(!inicio || !dias || dias <= 0){
+        corteInput.value = "";
+        return;
+      }
+      const corte = new Date(inicio);
+      corte.setDate(corte.getDate() + (dias - 1));
+      corteInput.value = formatDMY(corte);
+    }
+
+    // intenta setear el select según el DIAS_SERVICIO existente (si coincide)
+    (function init(){
+      const diasActual = parseInt("{{ r.get('DIAS_SERVICIO','') }}", 10);
+      const select = document.getElementById("dias_servicio_select");
+      if(diasActual && diasActual > 0){
+        let found = false;
+        for(const opt of select.options){
+          if(parseInt(opt.value,10) === diasActual){
+            opt.selected = true;
+            found = true;
+            break;
+          }
+        }
+        if(!found){
+          document.getElementById("dias_custom").value = diasActual;
+        }
+      }
+      updateFechaCorte();
+    })();
+
+    document.getElementById("fecha_inicio").addEventListener("input", updateFechaCorte);
+    document.getElementById("dias_servicio_select").addEventListener("change", updateFechaCorte);
+    document.getElementById("dias_custom").addEventListener("input", updateFechaCorte);
+  </script>
+</body>
+</html>
