@@ -11,7 +11,6 @@ from fastapi.staticfiles import StaticFiles
 from telethon import TelegramClient
 import config
 
-
 # -----------------------
 # APP / TEMPLATES / STATIC
 # -----------------------
@@ -53,7 +52,6 @@ SEARCH_FIELDS = [
     "CORREO_ELECTRONICO",
     "SERVICIO_OTORGADO",
 ]
-
 
 # -----------------------
 # DB
@@ -250,7 +248,6 @@ def get_registro_by_pk(pk: int) -> Optional[Dict[str, str]]:
         return None
     return row_to_registro(row)
 
-
 # -----------------------
 # FECHAS / CÁLCULOS
 # -----------------------
@@ -259,10 +256,6 @@ def parse_fecha(s: str) -> Optional[dt.date]:
     if not s:
         return None
     return dt.datetime.strptime(s, "%d/%m/%Y").date()
-
-
-def format_fecha(d: dt.date) -> str:
-    return d.strftime("%d/%m/%Y")
 
 
 def dias_restantes(fecha_corte_str: str) -> Optional[int]:
@@ -284,7 +277,6 @@ def nombre_para_mensaje(r: Dict[str, str]) -> str:
     nom = (r.get("NOMBRE_CLIENTE") or "").strip()
     arroba = (r.get("TIENE_ARROBA") or "").strip()
     return nom or arroba or "cliente"
-
 
 # -----------------------
 # SEARCH
@@ -312,7 +304,6 @@ def apply_search(regs_with_idx: List[Tuple[int, Dict[str, str]]], field: str, q:
         return q in (rec.get(field, "") or "").lower()
 
     return [(i, r) for (i, r) in regs_with_idx if match_in_record(r)]
-
 
 # -----------------------
 # MENSAJES COBRO
@@ -418,7 +409,6 @@ async def telegram_send(r: Dict[str, str]) -> str:
 
         return "SIN_DESTINO"
 
-
 # -----------------------
 # STARTUP
 # -----------------------
@@ -427,18 +417,25 @@ def startup_event():
     init_db()
     migrar_txt_a_db_si_vacio()
 
-
 # -----------------------
 # ROUTES
 # -----------------------
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context={}
+    )
 
 
 @app.get("/registrar", response_class=HTMLResponse)
 def registrar_form(request: Request):
-    return templates.TemplateResponse("registrar.html", {"request": request, "error": ""})
+    return templates.TemplateResponse(
+        request=request,
+        name="registrar.html",
+        context={"error": ""}
+    )
 
 
 @app.post("/registrar")
@@ -501,14 +498,14 @@ async def registrar_post(
 @app.get("/cobrar", response_class=HTMLResponse)
 def cobrar(request: Request, field: str = "ALL", q: str = ""):
     registros = leer_registros()
-    regs_with_idx = list(enumerate(registros))
+    regs_with_idx = [(int(r.get("PK", "0")), r) for r in registros]
     filtrados = apply_search(regs_with_idx, field, q)
 
     rows = []
-    for _, r in filtrados:
+    for idx, r in filtrados:
         dr = dias_restantes(r.get("FECHA_CORTE", ""))
         rows.append({
-            "id": int(r.get("PK", "0")),
+            "id": idx,
             "cliente": (r.get("NOMBRE_CLIENTE") or r.get("TIENE_ARROBA") or "").strip(),
             "servicio": (r.get("SERVICIO_OTORGADO") or "").strip(),
             "fecha_corte": (r.get("FECHA_CORTE") or "").strip(),
@@ -519,9 +516,9 @@ def cobrar(request: Request, field: str = "ALL", q: str = ""):
 
     res = request.query_params.get("res", "")
     return templates.TemplateResponse(
-        "cobrar.html",
-        {
-            "request": request,
+        request=request,
+        name="cobrar.html",
+        context={
             "rows": rows,
             "res": res,
             "field": field,
@@ -586,9 +583,9 @@ def stats(request: Request, field: str = "ALL", q: str = ""):
     filtrados = apply_search(regs_with_idx, field, q)
 
     return templates.TemplateResponse(
-        "stats.html",
-        {
-            "request": request,
+        request=request,
+        name="stats.html",
+        context={
             "regs_with_idx": filtrados,
             "fields": FIELDS_ORDER,
             "field": field,
@@ -605,8 +602,13 @@ def editar_form(request: Request, registro_id: int):
         raise HTTPException(status_code=404, detail="Registro no encontrado")
 
     return templates.TemplateResponse(
-        "editar.html",
-        {"request": request, "r": r, "registro_id": registro_id, "error": ""}
+        request=request,
+        name="editar.html",
+        context={
+            "r": r,
+            "registro_id": registro_id,
+            "error": ""
+        }
     )
 
 
