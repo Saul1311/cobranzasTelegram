@@ -23,7 +23,7 @@
   <div class="gridlines"></div>
   <div class="wrap">
     <h1>📊 ESTADÍSTICAS / BASE COMPLETA</h1>
-    <p class="sub">Se lee 100% desde <b>registro.txt</b>. Incluye BUSCAR 🔎 y EDITAR.</p>
+    <p class="sub">Se lee 100% desde la base de datos. Incluye BUSCAR 🔎 y EDITAR.</p>
 
     <div class="panel">
       <div class="top">
@@ -34,9 +34,9 @@
 
         <form method="get" action="/stats" class="searchbar">
           <select name="field">
-            <option value="ALL" {% if field=="ALL" %}selected{% endif %}>TODOS</option>
+            <option value="ALL" {% if field == "ALL" %}selected{% endif %}>TODOS</option>
             {% for f in search_fields %}
-              <option value="{{ f }}" {% if field==f %}selected{% endif %}>{{ f }}</option>
+              <option value="{{ f }}" {% if field == f %}selected{% endif %}>{{ f }}</option>
             {% endfor %}
           </select>
           <input name="q" value="{{ q }}" placeholder="BUSCAR 🔎 (valor o texto)">
@@ -49,7 +49,7 @@
         <table>
           <thead>
             <tr>
-              <th>#</th>
+              <th>ID</th>
               {% for f in fields %}
                 <th>{{ f }}</th>
               {% endfor %}
@@ -57,9 +57,7 @@
             </tr>
           </thead>
           <tbody>
-            {% for pair in regs_with_idx %}
-              {% set idx = pair[0] %}
-              {% set r = pair[1] %}
+            {% for idx, r in regs_with_idx %}
               <tr>
                 <td>{{ idx }}</td>
                 {% for f in fields %}

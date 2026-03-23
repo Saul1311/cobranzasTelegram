@@ -582,7 +582,7 @@ async def eliminar_registro(registro_id: int):
 @app.get("/stats", response_class=HTMLResponse)
 def stats(request: Request, field: str = "ALL", q: str = ""):
     registros = leer_registros()
-    regs_with_idx = list(enumerate(registros))
+    regs_with_idx = [(int(r.get("PK", "0")), r) for r in registros]
     filtrados = apply_search(regs_with_idx, field, q)
 
     return templates.TemplateResponse(
