@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import datetime as dt
 from typing import Optional, List, Dict, Tuple
 
@@ -10,13 +11,13 @@ from fastapi.staticfiles import StaticFiles
 from telethon import TelegramClient
 import config
 
+
 # -----------------------
 # APP / TEMPLATES / STATIC
 # -----------------------
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-# crear static si no existe (evita crash)
 os.makedirs("static", exist_ok=True)
 style_path = os.path.join("static", "style.css")
 if not os.path.exists(style_path):
@@ -53,16 +54,75 @@ SEARCH_FIELDS = [
     "SERVICIO_OTORGADO",
 ]
 
+
 # -----------------------
-# TXT STORAGE
+# DB
 # -----------------------
+def get_db_path() -> str:
+    db_url = (config.DB_URL or "").strip()
+
+    if db_url.startswith("sqlite:///"):
+        return db_url.replace("sqlite:///", "", 1)
+
+    if not db_url:
+        return "clientes.db"
+
+    return db_url
+
+
+DB_PATH = get_db_path()
+
+
+def get_conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db() -> None:
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS clientes (
+            pk INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_telegram TEXT DEFAULT '',
+            nombre_cliente TEXT DEFAULT '',
+            id_cliente TEXT DEFAULT '',
+            tiene_arroba TEXT DEFAULT '',
+            correo_electronico TEXT DEFAULT '',
+            contrasena TEXT DEFAULT '',
+            fecha_inicio TEXT DEFAULT '',
+            fecha_corte TEXT DEFAULT '',
+            dias_servicio TEXT DEFAULT '',
+            servicio_otorgado TEXT DEFAULT '',
+            perfil_cuenta TEXT DEFAULT '',
+            pin_cuenta TEXT DEFAULT '',
+            monto_pagado TEXT DEFAULT '',
+            dispositivos TEXT DEFAULT ''
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+def count_clientes() -> int:
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM clientes")
+    total = cur.fetchone()[0]
+    conn.close()
+    return total
+
+
 def ensure_registro_txt():
     if not os.path.exists(TEMPLATE_FILE):
         with open(TEMPLATE_FILE, "w", encoding="utf-8") as f:
             f.write("")
 
 
-def leer_registros() -> List[Dict[str, str]]:
+def leer_registros_txt() -> List[Dict[str, str]]:
     ensure_registro_txt()
     registros: List[Dict[str, str]] = []
 
@@ -87,12 +147,108 @@ def leer_registros() -> List[Dict[str, str]]:
     return registros
 
 
-def guardar_registros(registros: List[Dict[str, str]]) -> None:
-    with open(TEMPLATE_FILE, "w", encoding="utf-8") as f:
-        for r in registros:
-            for k in FIELDS_ORDER:
-                f.write(f"{k}: {r.get(k, '')}\n")
-            f.write("\n")
+def migrar_txt_a_db_si_vacio() -> None:
+    init_db()
+
+    if count_clientes() > 0:
+        return
+
+    if not os.path.exists(TEMPLATE_FILE):
+        return
+
+    registros = leer_registros_txt()
+    if not registros:
+        return
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    for r in registros:
+        cur.execute("""
+            INSERT INTO clientes (
+                id_telegram, nombre_cliente, id_cliente, tiene_arroba,
+                correo_electronico, contrasena, fecha_inicio, fecha_corte,
+                dias_servicio, servicio_otorgado, perfil_cuenta, pin_cuenta,
+                monto_pagado, dispositivos
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            r.get("ID", ""),
+            r.get("NOMBRE_CLIENTE", ""),
+            r.get("ID_CLIENTE", ""),
+            r.get("TIENE_ARROBA", ""),
+            r.get("CORREO_ELECTRONICO", ""),
+            r.get("CONTRASEÑA", ""),
+            r.get("FECHA_INICIO", ""),
+            r.get("FECHA_CORTE", ""),
+            r.get("DIAS_SERVICIO", ""),
+            r.get("SERVICIO_OTORGADO", ""),
+            r.get("PERFIL_CUENTA", ""),
+            r.get("PIN_CUENTA", ""),
+            r.get("MONTO_PAGADO", ""),
+            r.get("DISPOSITIVOS", ""),
+        ))
+
+    conn.commit()
+    conn.close()
+
+
+def row_to_registro(row: sqlite3.Row) -> Dict[str, str]:
+    return {
+        "PK": str(row["pk"]),
+        "ID": row["id_telegram"] or "",
+        "NOMBRE_CLIENTE": row["nombre_cliente"] or "",
+        "ID_CLIENTE": row["id_cliente"] or "",
+        "TIENE_ARROBA": row["tiene_arroba"] or "",
+        "CORREO_ELECTRONICO": row["correo_electronico"] or "",
+        "CONTRASEÑA": row["contrasena"] or "",
+        "FECHA_INICIO": row["fecha_inicio"] or "",
+        "FECHA_CORTE": row["fecha_corte"] or "",
+        "DIAS_SERVICIO": row["dias_servicio"] or "",
+        "SERVICIO_OTORGADO": row["servicio_otorgado"] or "",
+        "PERFIL_CUENTA": row["perfil_cuenta"] or "",
+        "PIN_CUENTA": row["pin_cuenta"] or "",
+        "MONTO_PAGADO": row["monto_pagado"] or "",
+        "DISPOSITIVOS": row["dispositivos"] or "",
+    }
+
+
+def leer_registros() -> List[Dict[str, str]]:
+    init_db()
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT
+            pk, id_telegram, nombre_cliente, id_cliente, tiene_arroba,
+            correo_electronico, contrasena, fecha_inicio, fecha_corte,
+            dias_servicio, servicio_otorgado, perfil_cuenta, pin_cuenta,
+            monto_pagado, dispositivos
+        FROM clientes
+        ORDER BY pk ASC
+    """)
+    rows = cur.fetchall()
+    conn.close()
+    return [row_to_registro(r) for r in rows]
+
+
+def get_registro_by_pk(pk: int) -> Optional[Dict[str, str]]:
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT
+            pk, id_telegram, nombre_cliente, id_cliente, tiene_arroba,
+            correo_electronico, contrasena, fecha_inicio, fecha_corte,
+            dias_servicio, servicio_otorgado, perfil_cuenta, pin_cuenta,
+            monto_pagado, dispositivos
+        FROM clientes
+        WHERE pk = ?
+    """, (pk,))
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        return None
+    return row_to_registro(row)
 
 
 # -----------------------
@@ -146,12 +302,13 @@ def apply_search(regs_with_idx: List[Tuple[int, Dict[str, str]]], field: str, q:
                 if q in (rec.get(f, "") or "").lower():
                     return True
             return False
+
         if field not in FIELDS_ORDER:
-            # si campo raro, busca en todo
             for f in SEARCH_FIELDS:
                 if q in (rec.get(f, "") or "").lower():
                     return True
             return False
+
         return q in (rec.get(field, "") or "").lower()
 
     return [(i, r) for (i, r) in regs_with_idx if match_in_record(r)]
@@ -236,7 +393,6 @@ async def telegram_send(r: Dict[str, str]) -> str:
             return "OK"
 
         if id_num is not None:
-            # puede fallar si no hay chat previo
             try:
                 ent = await client.get_entity(id_num)
                 await client.send_message(ent, mensaje)
@@ -261,6 +417,15 @@ async def telegram_send(r: Dict[str, str]) -> str:
                 return "NO_ENTIDAD_PARA_ID"
 
         return "SIN_DESTINO"
+
+
+# -----------------------
+# STARTUP
+# -----------------------
+@app.on_event("startup")
+def startup_event():
+    init_db()
+    migrar_txt_a_db_si_vacio()
 
 
 # -----------------------
@@ -293,30 +458,43 @@ async def registrar_post(
     pin_cuenta: str = Form(""),
     monto_pagado: str = Form(""),
 ):
-    registros = leer_registros()
-
     ta = (tiene_arroba or "").strip()
     if ta and not ta.startswith("@"):
         ta = "@" + ta
 
-    nuevo = {k: "" for k in FIELDS_ORDER}
-    nuevo["NOMBRE_CLIENTE"] = (nombre_cliente or "").strip()
-    nuevo["TIENE_ARROBA"] = ta
-    nuevo["ID_CLIENTE"] = (id_cliente or "").strip()
-    nuevo["ID"] = (id_telegram or "").strip()
-    nuevo["CORREO_ELECTRONICO"] = (correo or "").strip()
-    nuevo["CONTRASEÑA"] = (contrasena or "").strip()
-    nuevo["FECHA_INICIO"] = (fecha_inicio or "").strip()
-    nuevo["FECHA_CORTE"] = (fecha_corte or "").strip()
-    nuevo["DIAS_SERVICIO"] = calc_dias(nuevo["FECHA_INICIO"], nuevo["FECHA_CORTE"])
-    nuevo["SERVICIO_OTORGADO"] = (servicio_otorgado or "").strip()
-    nuevo["DISPOSITIVOS"] = (dispositivos or "").strip()
-    nuevo["PERFIL_CUENTA"] = (perfil_cuenta or "").strip()
-    nuevo["PIN_CUENTA"] = (pin_cuenta or "").strip()
-    nuevo["MONTO_PAGADO"] = (monto_pagado or "").strip()
+    fi = (fecha_inicio or "").strip()
+    fc = (fecha_corte or "").strip()
+    dias = calc_dias(fi, fc)
 
-    registros.append(nuevo)
-    guardar_registros(registros)
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO clientes (
+            id_telegram, nombre_cliente, id_cliente, tiene_arroba,
+            correo_electronico, contrasena, fecha_inicio, fecha_corte,
+            dias_servicio, servicio_otorgado, perfil_cuenta, pin_cuenta,
+            monto_pagado, dispositivos
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        (id_telegram or "").strip(),
+        (nombre_cliente or "").strip(),
+        (id_cliente or "").strip(),
+        ta,
+        (correo or "").strip(),
+        (contrasena or "").strip(),
+        fi,
+        fc,
+        dias,
+        (servicio_otorgado or "").strip(),
+        (perfil_cuenta or "").strip(),
+        (pin_cuenta or "").strip(),
+        (monto_pagado or "").strip(),
+        (dispositivos or "").strip(),
+    ))
+    conn.commit()
+    conn.close()
+
     return RedirectResponse(url="/stats", status_code=303)
 
 
@@ -327,33 +505,39 @@ def cobrar(request: Request, field: str = "ALL", q: str = ""):
     filtrados = apply_search(regs_with_idx, field, q)
 
     rows = []
-    for idx, r in filtrados:
+    for _, r in filtrados:
         dr = dias_restantes(r.get("FECHA_CORTE", ""))
         rows.append({
-            "id": idx,
+            "id": int(r.get("PK", "0")),
             "cliente": (r.get("NOMBRE_CLIENTE") or r.get("TIENE_ARROBA") or "").strip(),
             "servicio": (r.get("SERVICIO_OTORGADO") or "").strip(),
             "fecha_corte": (r.get("FECHA_CORTE") or "").strip(),
             "restantes": dr,
         })
 
-    # orden menor -> mayor
     rows.sort(key=lambda x: (x["restantes"] is None, x["restantes"] if x["restantes"] is not None else 10**9))
 
     res = request.query_params.get("res", "")
     return templates.TemplateResponse(
         "cobrar.html",
-        {"request": request, "rows": rows, "res": res, "field": field, "q": q, "search_fields": SEARCH_FIELDS}
+        {
+            "request": request,
+            "rows": rows,
+            "res": res,
+            "field": field,
+            "q": q,
+            "search_fields": SEARCH_FIELDS,
+        }
     )
 
 
 @app.post("/cobrar/enviar/{registro_id}")
 async def cobrar_uno(registro_id: int):
-    registros = leer_registros()
-    if registro_id < 0 or registro_id >= len(registros):
+    r = get_registro_by_pk(registro_id)
+    if not r:
         raise HTTPException(status_code=404, detail="Registro no encontrado")
 
-    res = await telegram_send(registros[registro_id])
+    res = await telegram_send(r)
     return RedirectResponse(url=f"/cobrar?res={res}", status_code=303)
 
 
@@ -382,12 +566,16 @@ async def cobrar_todos():
 
 @app.post("/cobrar/eliminar/{registro_id}")
 async def eliminar_registro(registro_id: int):
-    registros = leer_registros()
-    if registro_id < 0 or registro_id >= len(registros):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM clientes WHERE pk = ?", (registro_id,))
+    conn.commit()
+    deleted = cur.rowcount
+    conn.close()
+
+    if deleted == 0:
         raise HTTPException(status_code=404, detail="Registro no encontrado")
 
-    registros.pop(registro_id)
-    guardar_registros(registros)
     return RedirectResponse(url="/cobrar?res=ELIMINADO", status_code=303)
 
 
@@ -412,11 +600,10 @@ def stats(request: Request, field: str = "ALL", q: str = ""):
 
 @app.get("/editar/{registro_id}", response_class=HTMLResponse)
 def editar_form(request: Request, registro_id: int):
-    registros = leer_registros()
-    if registro_id < 0 or registro_id >= len(registros):
+    r = get_registro_by_pk(registro_id)
+    if not r:
         raise HTTPException(status_code=404, detail="Registro no encontrado")
 
-    r = registros[registro_id]
     return templates.TemplateResponse(
         "editar.html",
         {"request": request, "r": r, "registro_id": registro_id, "error": ""}
@@ -441,34 +628,56 @@ async def editar_post(
     pin_cuenta: str = Form(""),
     monto_pagado: str = Form(""),
 ):
-    registros = leer_registros()
-    if registro_id < 0 or registro_id >= len(registros):
+    existente = get_registro_by_pk(registro_id)
+    if not existente:
         raise HTTPException(status_code=404, detail="Registro no encontrado")
 
     ta = (tiene_arroba or "").strip()
     if ta and not ta.startswith("@"):
         ta = "@" + ta
 
-    # Actualiza el registro seleccionado
-    r = registros[registro_id]
-    r["NOMBRE_CLIENTE"] = (nombre_cliente or "").strip()
-    r["TIENE_ARROBA"] = ta
-    r["ID_CLIENTE"] = (id_cliente or "").strip()
-    r["ID"] = (id_telegram or "").strip()
-    r["CORREO_ELECTRONICO"] = (correo or "").strip()
-    r["CONTRASEÑA"] = (contrasena or "").strip()
-    r["FECHA_INICIO"] = (fecha_inicio or "").strip()
-    r["FECHA_CORTE"] = (fecha_corte or "").strip()
-    r["DIAS_SERVICIO"] = calc_dias(r["FECHA_INICIO"], r["FECHA_CORTE"])
-    r["SERVICIO_OTORGADO"] = (servicio_otorgado or "").strip()
-    r["DISPOSITIVOS"] = (dispositivos or "").strip()
-    r["PERFIL_CUENTA"] = (perfil_cuenta or "").strip()
-    r["PIN_CUENTA"] = (pin_cuenta or "").strip()
-    r["MONTO_PAGADO"] = (monto_pagado or "").strip()
+    fi = (fecha_inicio or "").strip()
+    fc = (fecha_corte or "").strip()
+    dias = calc_dias(fi, fc)
 
-    # asegura campos
-    for k in FIELDS_ORDER:
-        r.setdefault(k, "")
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE clientes
+        SET
+            id_telegram = ?,
+            nombre_cliente = ?,
+            id_cliente = ?,
+            tiene_arroba = ?,
+            correo_electronico = ?,
+            contrasena = ?,
+            fecha_inicio = ?,
+            fecha_corte = ?,
+            dias_servicio = ?,
+            servicio_otorgado = ?,
+            perfil_cuenta = ?,
+            pin_cuenta = ?,
+            monto_pagado = ?,
+            dispositivos = ?
+        WHERE pk = ?
+    """, (
+        (id_telegram or "").strip(),
+        (nombre_cliente or "").strip(),
+        (id_cliente or "").strip(),
+        ta,
+        (correo or "").strip(),
+        (contrasena or "").strip(),
+        fi,
+        fc,
+        dias,
+        (servicio_otorgado or "").strip(),
+        (perfil_cuenta or "").strip(),
+        (pin_cuenta or "").strip(),
+        (monto_pagado or "").strip(),
+        (dispositivos or "").strip(),
+        registro_id,
+    ))
+    conn.commit()
+    conn.close()
 
-    guardar_registros(registros)
     return RedirectResponse(url="/stats?res=EDITADO", status_code=303)
